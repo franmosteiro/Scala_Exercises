@@ -88,7 +88,7 @@ object Huffman {
    * of a leaf is the frequency of the character.
    */
   def makeOrderedLeafList(freqs: List[(Char, Int)]): List[Leaf] = 
-    freqs.sortBy(_._2).map(x => Leaf(x._1, x._2))
+    freqs.sortWith((x, y) => x._2 < y._2).map(x => Leaf(x._1, x._2))
 
   /**
    * Checks whether the list `trees` contains only one single code tree.
@@ -107,9 +107,21 @@ object Huffman {
    * If `trees` is a list of less than two elements, that list should be returned
    * unchanged.
    */
-  def combine(trees: List[CodeTree]): List[CodeTree] = trees match {
+  
+  /* MINE def combine(trees: List[CodeTree]): List[CodeTree] = trees match {
     case t1 :: t2 :: ts => makeCodeTree(t1, t2) :: ts
     case _ => trees
+  }
+  * */
+  def combine(trees: List[CodeTree]): List[CodeTree] = {
+    def insert(x: CodeTree, xs: List[CodeTree]): List[CodeTree] = xs match {
+      case List() => List(x)
+      case y :: ys => if (weight(x) < weight(y)) x :: xs else y :: insert(x, ys)
+    }
+    trees match {
+      case xs if xs.size < 2 => trees
+      case x :: y :: rs => insert(makeCodeTree(x, y), rs)
+    }
   }
 
   /**
@@ -182,7 +194,7 @@ object Huffman {
   /**
    * Write a function that returns the decoded secret
    */
-  def decodedSecret: List[Char] = ???
+  def decodedSecret: List[Char] = decode(frenchCode, secret)
 
 
 
@@ -193,14 +205,19 @@ object Huffman {
    * into a sequence of bits.
    */
   def encode(tree: CodeTree)(text: List[Char]): List[Bit] = {
-    def recursiveEncode(restOfTree: CodeTree, restOfText: List[Char], bits: List[Bit]): List[Bit] = (restOfTree, restOfText) match {
-      case (Fork(l, r, cs, w), t :: ts) => if (chars(l).contains(t)) recursiveEncode(l, restOfText, 0 :: bits) 
-    		  								else recursiveEncode(r, restOfText, 1 :: bits)
-      case (_, Nil) => bits
-      case (Leaf(c, w), t :: ts) => recursiveEncode(tree, ts, bits) 
-      case (_, List(_)) => List()
+    def encodeHelp(subtext: List[Char]): List[Bit] = {
+      def encodeChar(subtree: CodeTree, char: Char, acc: List[Bit]): List[Bit] = subtree match {
+        case Leaf(c, w) => if (c == char) acc else List()
+        case Fork(l, r, c, w) => if (!c.contains(char)) List() else encodeChar(l, char, acc ::: List(0)) ::: encodeChar(r, char, acc ::: List(1))
+      }
+
+      subtext match {
+        case List() => List()
+        case x :: xs => encodeChar(tree, x, List()) ::: encodeHelp(xs)
+      }
     }
-    recursiveEncode(tree, text, List()).reverse
+
+    encodeHelp(text)
   }
 
 
